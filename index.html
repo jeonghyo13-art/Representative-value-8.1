@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>다트 통계 탐험대 - 대푯값 마스터</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Google Fonts: Gaegu, Gowun Dodum, Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Gowun+Dodum&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            pastel: {
+              pink: '#FFD1DC',
+              pinkLight: '#FFF0F5',
+              pinkDark: '#F48FB1',
+              lavender: '#E6E6FA',
+              purple: '#D8B4F8',
+              sky: '#D0E8FF',
+              skyDark: '#81C784',
+              mint: '#D8F3DC',
+              mintDark: '#74C69D',
+              yellow: '#FFF3B0',
+              yellowDark: '#FDE047',
+              cream: '#FCF9F2',
+              peach: '#FFE5D9',
+              coral: '#FFB5A7',
+              slate: '#5A6275',
+              navy: '#344054'
+            }
+          },
+          fontFamily: {
+            dodum: ['"Gowun Dodum"', 'sans-serif'],
+            fun: ['"Gaegu"', 'cursive'],
+            num: ['"Nunito"', 'sans-serif']
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-6px)' }
+            },
+            popIn: {
+              '0%': { transform: 'scale(0.8)', opacity: '0' },
+              '100%': { transform: 'scale(1)', opacity: '1' }
+            },
+            dartFlight: {
+              '0%': { transform: 'scale(1.4) translateY(60px)', opacity: '0' },
+              '60%': { transform: 'scale(1.1) translateY(-10px)', opacity: '1' },
+              '100%': { transform: 'scale(1) translateY(0)', opacity: '1' }
+            }
+          },
+          animation: {
+            float: 'float 3s ease-in-out infinite',
+            popIn: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+            dartFlight: 'dartFlight 0.35s ease-out forwards'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Gowun Dodum', sans-serif;
+      background: linear-gradient(135deg, #FFF0F5 0%, #E8F4FD 50%, #F0FDF4 100%);
+      min-height: 100vh;
+      color: #3f4756;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #CBD5E1;
+      border-radius: 9999px;
+    }
+    .chalk-board {
+      background: linear-gradient(145deg, #FDFBF7, #F4F1EA);
+      box-shadow: 0 10px 25px -5px rgba(100, 116, 139, 0.1), 0 8px 10px -6px rgba(100, 116, 139, 0.05);
+    }
+    .dart-target {
+      cursor: crosshair;
+      touch-action: none;
+    }
+    /* 조준 초점 펄스 애니메이션 */
+    @keyframes aimPulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.15); opacity: 0.6; }
+    }
+    .aim-reticle-pulse {
+      animation: aimPulse 1s ease-in-out infinite;
+      transform-origin: center;
+    }
+  </style>
+</head>
+<body class="p-3 md:p-6 flex flex-col justify-between">
+
+  <!-- 상단 헤더 -->
+  <header class="max-w-6xl mx-auto w-full mb-4">
+    <div class="bg-white/80 backdrop-blur-md rounded-3xl p-4 md:p-5 shadow-sm border border-white/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pastel-pink to-pastel-purple flex items-center justify-center text-2xl shadow-inner animate-float">
+          🎯
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl md:text-2xl font-black text-pastel-navy tracking-tight font-dodum">중1 통계 탐험대 : 다트 게임</h1>
+            <span class="text-xs bg-pastel-yellow text-amber-800 font-bold px-2 py-0.5 rounded-full border border-amber-200">대푯값 3총사</span>
+          </div>
+          <p class="text-xs md:text-sm text-pastel-slate">다트를 던져 점수를 얻고, <span class="text-pink-600 font-bold">평균</span>·<span class="text-purple-600 font-bold">중앙값</span>·<span class="text-emerald-600 font-bold">최빈값</span>을 직접 계산해 봐요!</p>
+        </div>
+      </div>
+      
+      <!-- 상단 툴바 / 액션 -->
+      <div class="flex items-center gap-2">
+        <button id="btn-sound" class="p-2.5 rounded-2xl bg-pastel-sky/50 hover:bg-pastel-sky text-sky-800 font-medium text-sm transition flex items-center gap-1.5 shadow-sm" title="효과음 켜기/끄기">
+          <span id="sound-icon">🔊</span>
+        </button>
+        <button id="btn-random-fill" class="px-3.5 py-2 rounded-2xl bg-pastel-peach/60 hover:bg-pastel-peach text-orange-800 text-xs md:text-sm font-bold transition flex items-center gap-1 shadow-sm">
+          <span>🎲</span> 샘플 7발 채우기
+        </button>
+        <button id="btn-reset" class="px-3.5 py-2 rounded-2xl bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs md:text-sm font-bold transition flex items-center gap-1 shadow-sm">
+          <span>🔄</span> 새로고침
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 게임 컨테이너 -->
+  <main class="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-5 flex-grow">
+    
+    <!-- 왼쪽: 다트 판 & 투척 구역 (7 cols) -->
+    <section class="lg:col-span-7 flex flex-col gap-4">
+      <div class="bg-white/90 backdrop-blur-sm rounded-3xl p-4 md:p-6 shadow-sm border border-white flex flex-col items-center relative overflow-hidden">
+        
+        <!-- 게임 모드 & 다트 수 안내 -->
+        <div class="w-full flex justify-between items-center mb-3 px-1">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
+            <span id="guide-text" class="text-xs md:text-sm font-bold text-pastel-navy">초점을 맞추고 타이밍에 맞춰 <b>[🎯 발사!]</b> 버튼을 누르세요! (최대 15발)</span>
+          </div>
+          <div class="text-xs md:text-sm font-extrabold text-purple-700 bg-pastel-lavender/70 px-3 py-1 rounded-xl">
+            던진 횟수: <span id="dart-count" class="text-base text-purple-900 font-num">0</span> / 15발
+          </div>
+        </div>
+
+        <!-- 다트판 SVG 캔버스 영역 -->
+        <div class="relative w-full max-w-[380px] sm:max-w-[420px] aspect-square flex items-center justify-center p-2">
+          <!-- 부드러운 파스텔 다트 과녁 -->
+          <svg id="dartboard-svg" class="dart-target w-full h-full drop-shadow-xl select-none" viewBox="0 0 400 400">
+            <defs>
+              <filter id="soft-shadow" x="-10%" y="-10%" width="120%" height="120%">
+                <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.12" flood-color="#4a5568"/>
+              </filter>
+              <!-- 은은한 파스텔 그라디언트 -->
+              <radialGradient id="ring-outer" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#E2F1FF"/>
+                <stop offset="100%" stop-color="#CADEF5"/>
+              </radialGradient>
+              <radialGradient id="ring-mid2" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#EAFBEE"/>
+                <stop offset="100%" stop-color="#D4F4DC"/>
+              </radialGradient>
+              <radialGradient id="ring-mid1" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#FFFBE5"/>
+                <stop offset="100%" stop-color="#FCEFB8"/>
+              </radialGradient>
+              <radialGradient id="ring-inner" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#FFEBE5"/>
+                <stop offset="100%" stop-color="#FDCAC0"/>
+              </radialGradient>
+              <radialGradient id="ring-bull" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#FF9AA2"/>
+                <stop offset="100%" stop-color="#FF6978"/>
+              </radialGradient>
+            </defs>
+
+            <!-- 외부 배경 원테두리 장식 -->
+            <circle cx="200" cy="200" r="195" fill="#FAF5FF" stroke="#E2E8F0" stroke-width="4" filter="url(#soft-shadow)"/>
+            
+            <!-- 점수 영역 링들 (반지름: 180, 140, 100, 60, 25) -->
+            <!-- 2점 구역 (반지름 180) -->
+            <circle cx="200" cy="200" r="180" fill="url(#ring-outer)" stroke="#B6D4F2" stroke-width="2.5" class="transition-opacity hover:opacity-95" data-score="2"/>
+            <!-- 4점 구역 (반지름 140) -->
+            <circle cx="200" cy="200" r="140" fill="url(#ring-mid2)" stroke="#B5E4C3" stroke-width="2.5" class="transition-opacity hover:opacity-95" data-score="4"/>
+            <!-- 6점 구역 (반지름 100) -->
+            <circle cx="200" cy="200" r="100" fill="url(#ring-mid1)" stroke="#F8DF90" stroke-width="2.5" class="transition-opacity hover:opacity-95" data-score="6"/>
+            <!-- 8점 구역 (반지름 60) -->
+            <circle cx="200" cy="200" r="60" fill="url(#ring-inner)" stroke="#F9B3A7" stroke-width="2.5" class="transition-opacity hover:opacity-95" data-score="8"/>
+            <!-- 10점 불스아이 (반지름 25) -->
+            <circle cx="200" cy="200" r="25" fill="url(#ring-bull)" stroke="#FF4D5E" stroke-width="2.5" class="transition-opacity hover:opacity-95" data-score="10"/>
+
+            <!-- 점수 텍스트 표시 레이블 -->
+            <g font-family="'Nunito', sans-serif" font-weight="900" font-size="14" fill="#64748B" text-anchor="middle" dominant-baseline="middle" pointer-events="none">
+              <!-- 2점 -->
+              <text x="200" y="38">2점</text>
+              <text x="200" y="362">2점</text>
+              <text x="38" y="200">2점</text>
+              <text x="362" y="200">2점</text>
+              <!-- 4점 -->
+              <text x="200" y="78" fill="#4B7E68">4점</text>
+              <text x="200" y="322" fill="#4B7E68">4점</text>
+              <text x="78" y="200" fill="#4B7E68">4점</text>
+              <text x="322" y="200" fill="#4B7E68">4점</text>
+              <!-- 6점 -->
+              <text x="200" y="118" fill="#9B7811">6점</text>
+              <text x="200" y="282" fill="#9B7811">6점</text>
+              <!-- 8점 -->
+              <text x="200" y="156" fill="#B34B38">8점</text>
+              <text x="200" y="244" fill="#B34B38">8점</text>
+              <!-- 10점 불스아이 -->
+              <text x="200" y="200" font-size="15" fill="#FFFFFF">10</text>
+            </g>
+
+            <!-- 십자 조준 보조선 (은은하게) -->
+            <line x1="200" y1="20" x2="200" y2="380" stroke="rgba(255,255,255,0.45)" stroke-dasharray="3,3" pointer-events="none" />
+            <line x1="20" y1="200" x2="380" y2="200" stroke="rgba(255,255,255,0.45)" stroke-dasharray="3,3" pointer-events="none" />
+
+            <!-- 명중된 다트 핀들이 렌더링될 레이어 -->
+            <g id="dart-hits-layer"></g>
+
+            <!-- 실시간 동적 초점(Crosshair) 레이어 -->
+            <g id="aim-reticle" pointer-events="none">
+              <!-- 외부 반투명 링 -->
+              <circle id="reticle-outer" cx="200" cy="200" r="22" fill="none" stroke="#E11D48" stroke-width="2.5" stroke-dasharray="4,3" class="aim-reticle-pulse" />
+              <!-- 조준 십자선 -->
+              <line id="reticle-h" x1="172" y1="200" x2="228" y2="200" stroke="#E11D48" stroke-width="2" />
+              <line id="reticle-v" x1="200" y1="172" x2="200" y2="228" stroke="#E11D48" stroke-width="2" />
+              <!-- 중심 조준점 -->
+              <circle id="reticle-dot" cx="200" cy="200" r="3.5" fill="#E11D48" />
+            </g>
+          </svg>
+
+          <!-- 최근 점수 팝업 토스트 애니메이션 요소 -->
+          <div id="hit-toast" class="absolute pointer-events-none opacity-0 transform -translate-y-4 transition-all duration-300 font-fun text-3xl font-bold px-4 py-1.5 rounded-full shadow-lg"></div>
+        </div>
+
+        <!-- 하단 조준 & 발사 컨트롤 패널 (선택 영역 개편) -->
+        <div class="w-full mt-3 pt-3 border-t border-slate-100 flex flex-col items-center gap-2.5">
+          <div class="flex items-center gap-3 text-xs text-pastel-slate">
+            <span class="font-bold text-pink-700 bg-pink-50 px-2 py-0.5 rounded-md border border-pink-200">조준 방법</span>
+            <span>과녁 위를 계속해서 움직이는 초점의 타이밍을 노려 발사하세요! (단축키: 스페이스바)</span>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-center gap-2.5 w-full">
+            <!-- 메인 다트 발사 버튼 -->
+            <button id="btn-shoot-dart" class="w-full max-w-sm py-3.5 px-6 rounded-2xl bg-gradient-to-r from-pink-400 via-rose-400 to-pastel-purple hover:from-pink-500 hover:to-purple-500 text-white font-black text-base shadow-lg shadow-pink-200 active:scale-95 transition transform flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <span class="text-xl">🎯</span>
+              <span>지금 발사! (SHOOT)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 기록된 점수 모음 카드 -->
+      <div class="bg-white/90 backdrop-blur-sm rounded-3xl p-4 shadow-sm border border-white">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-base">📋</span>
+            <h3 class="font-bold text-sm md:text-base text-pastel-navy">수집된 데이터 (변량 목록)</h3>
+          </div>
+          <button id="btn-undo" class="text-xs text-rose-500 hover:text-rose-700 font-semibold px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 transition disabled:opacity-30 disabled:cursor-not-allowed">
+            ↩ 마지막 1발 취소
+          </button>
+        </div>
+
+        <!-- 점수 뱃지 목록 -->
+        <div id="score-tags-container" class="flex flex-wrap items-center gap-2 min-h-[46px] p-2 bg-pastel-cream rounded-2xl border border-amber-100/80 custom-scrollbar max-h-28 overflow-y-auto">
+          <span class="text-xs text-slate-400 font-normal italic px-2">과녁을 향해 다트를 던져보세요! 데이터가 여기에 쌓입니다.</span>
+        </div>
+
+        <!-- 정렬된 데이터 미리보기 안내 -->
+        <div class="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-pastel-slate">
+          <div class="flex items-center gap-1.5">
+            <span class="font-bold text-slate-600">크기순 정렬:</span>
+            <span id="sorted-preview" class="font-num font-bold text-purple-700">-</span>
+          </div>
+          <div class="font-semibold text-slate-500">
+            총합: <span id="sum-preview" class="font-num text-pink-600 font-black">0</span>점
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 오른쪽: 퀴즈 & 대푯값 도전실 (5 cols) -->
+    <section class="lg:col-span-5 flex flex-col gap-4">
+      
+      <!-- 학생 퀴즈 풀이 카드 (도전 단독 모드) -->
+      <div id="view-quiz" class="flex flex-col gap-3">
+        <div class="bg-white/95 rounded-3xl p-5 shadow-sm border border-white">
+          <div class="flex items-center justify-between mb-3 border-b border-purple-100 pb-3">
+            <h4 class="font-black text-pastel-navy flex items-center gap-2 text-base md:text-lg">
+              <span class="text-xl">✍️</span> 
+              <span>도전! 대푯값 마스터</span>
+            </h4>
+            <span class="text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full font-bold">중1 실전 퀴즈</span>
+          </div>
+
+          <div id="quiz-empty-alert" class="p-4 bg-purple-50 text-purple-800 rounded-2xl text-center text-xs md:text-sm mb-3 border border-purple-200">
+            🎯 다트를 최소 <b class="text-pink-600 font-bold">3발 이상</b> 던진 후 대푯값 퀴즈를 풀어보세요!
+          </div>
+
+          <form id="quiz-form" class="space-y-4 opacity-40 pointer-events-none transition-opacity duration-300">
+            <!-- 평균 입력 -->
+            <div class="bg-pink-50/50 p-3.5 rounded-2xl border border-pink-100">
+              <label class="block text-xs md:text-sm font-bold text-pink-700 mb-1.5 flex items-center justify-between">
+                <span>① 평균 (소수점 둘째자리 반올림)</span>
+                <span id="quiz-mean-status" class="text-xs font-bold"></span>
+              </label>
+              <div class="relative">
+                <input id="input-quiz-mean" type="number" step="0.01" placeholder="예: 6.25" class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-300 font-num text-sm text-pink-900 shadow-inner">
+              </div>
+            </div>
+
+            <!-- 중앙값 입력 -->
+            <div class="bg-purple-50/50 p-3.5 rounded-2xl border border-purple-100">
+              <label class="block text-xs md:text-sm font-bold text-purple-700 mb-1.5 flex items-center justify-between">
+                <span>② 중앙값 (가운데 값)</span>
+                <span id="quiz-median-status" class="text-xs font-bold"></span>
+              </label>
+              <input id="input-quiz-median" type="number" step="0.5" placeholder="예: 6 또는 5.5" class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-300 font-num text-sm text-purple-900 shadow-inner">
+            </div>
+
+            <!-- 최빈값 입력 -->
+            <div class="bg-emerald-50/50 p-3.5 rounded-2xl border border-emerald-100">
+              <label class="block text-xs md:text-sm font-bold text-emerald-700 mb-1.5 flex items-center justify-between">
+                <span>③ 최빈값 (가장 많이 나온 값)</span>
+                <span id="quiz-mode-status" class="text-xs font-bold"></span>
+              </label>
+              <input id="input-quiz-mode" type="text" placeholder="예: 6 또는 4, 8 또는 없음" class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 font-num text-sm text-emerald-900 shadow-inner">
+              <p class="text-[11px] text-emerald-600 mt-1">※ 여러 개면 쉼표(,)로 구분하고, 모두 같으면 '없음'을 입력하세요.</p>
+            </div>
+
+            <!-- 정답 확인 버튼 -->
+            <button type="submit" id="btn-quiz-check" class="w-full py-3 rounded-2xl bg-gradient-to-r from-pastel-pink via-purple-300 to-pastel-purple text-purple-950 font-black text-sm md:text-base shadow-md hover:opacity-95 active:scale-[0.99] transition">
+              정답 채점하기 ✨
+            </button>
+          </form>
+
+          <!-- 퀴즈 결과 피드백 박스 -->
+          <div id="quiz-feedback-box" class="mt-3.5 hidden p-3.5 rounded-2xl text-xs md:text-sm"></div>
+        </div>
+
+        <!-- 중1 통계 개념 쏙쏙 박스 -->
+        <div class="bg-amber-50/90 rounded-2xl p-4 border border-amber-200/80 text-amber-900 text-xs">
+          <div class="font-bold flex items-center gap-1.5 mb-1.5 text-amber-950 text-sm">
+            <span>💡</span> 중1 수학 개념 힌트
+          </div>
+          <ul class="space-y-1 text-amber-800 list-disc list-inside leading-relaxed">
+            <li><b>평균:</b> 모든 점수의 합 ÷ 던진 다트 수</li>
+            <li><b>중앙값:</b> 점수를 크기순으로 나열했을 때 한가운데 있는 값 (짝수 개일 땐 가운데 두 수의 평균)</li>
+            <li><b>최빈값:</b> 가장 많이 나온 점수 (등장 횟수가 모두 같으면 최빈값은 '없음')</li>
+          </ul>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- 하단 푸터 / 교실 안내 -->
+  <footer class="max-w-6xl mx-auto w-full mt-4 text-center text-xs text-pastel-slate">
+    <p>중학교 1학년 통계 단원 학습 보조 도구 • 알록달록 다트로 즐기는 수학 시간 🎈</p>
+  </footer>
+
+  <!-- 인라인 자바스크립트 로직 -->
+  <script>
+    // 상태 관리 변수
+    const state = {
+      scores: [],           // 점수 배열
+      hitPositions: [],     // 클릭된 좌표들 {x, y, score, id}
+      soundEnabled: true,
+      currentTab: 'learn',  // 'learn' | 'quiz'
+      aimX: 200,            // 현재 조준선 X
+      aimY: 200,            // 현재 조준선 Y
+      aimTime: 0
+    };
+
+    // 사운드 합성기 (Web Audio API - 외부 링크 의존성 없음)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSound(type) {
+      if (!state.soundEnabled) return;
+      try {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+
+        if (type === 'hit') {
+          // 다트 꽂히는 톡 소리
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(420, now);
+          osc.frequency.exponentialRampToValueAtTime(140, now + 0.12);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        } else if (type === 'bullseye') {
+          // 불스아이 명중 팡파레 느낌
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(523.25, now); // C5
+          osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+          osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+          osc.start(now);
+          osc.stop(now + 0.35);
+        } else if (type === 'correct') {
+          // 정답 차임벨
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, now); // D5
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.2); // A5
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === 'wrong') {
+          // 땡 부저
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.setValueAtTime(180, now + 0.15);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        }
+      } catch (e) {
+        console.warn('Audio play error:', e);
+      }
+    }
+
+    // DOM 요소 캐싱
+    const dartboardSvg = document.getElementById('dartboard-svg');
+    const dartHitsLayer = document.getElementById('dart-hits-layer');
+    const dartCountEl = document.getElementById('dart-count');
+    const scoreTagsContainer = document.getElementById('score-tags-container');
+    const sortedPreviewEl = document.getElementById('sorted-preview');
+    const sumPreviewEl = document.getElementById('sum-preview');
+    const hitToast = document.getElementById('hit-toast');
+
+    // 조준선(Reticle) DOM 캐싱
+    const reticleOuter = document.getElementById('reticle-outer');
+    const reticleH = document.getElementById('reticle-h');
+    const reticleV = document.getElementById('reticle-v');
+    const reticleDot = document.getElementById('reticle-dot');
+    const btnShootDart = document.getElementById('btn-shoot-dart');
+
+    // 퀴즈 요소 캐싱
+    const quizForm = document.getElementById('quiz-form');
+    const quizEmptyAlert = document.getElementById('quiz-empty-alert');
+    const quizFeedbackBox = document.getElementById('quiz-feedback-box');
+    const inputQuizMean = document.getElementById('input-quiz-mean');
+    const inputQuizMedian = document.getElementById('input-quiz-median');
+    const inputQuizMode = document.getElementById('input-quiz-mode');
+
+    // 버튼 요소
+    const btnReset = document.getElementById('btn-reset');
+    const btnUndo = document.getElementById('btn-undo');
+    const btnRandomFill = document.getElementById('btn-random-fill');
+    const btnSound = document.getElementById('btn-sound');
+    const soundIcon = document.getElementById('sound-icon');
+
+    // 조준선 위치 업데이트 함수
+    function setReticlePosition(x, y) {
+      // 캔버스 범위 내로 클램핑
+      x = Math.max(30, Math.min(370, x));
+      y = Math.max(30, Math.min(370, y));
+
+      state.aimX = x;
+      state.aimY = y;
+
+      reticleOuter.setAttribute('cx', x);
+      reticleOuter.setAttribute('cy', y);
+      reticleDot.setAttribute('cx', x);
+      reticleDot.setAttribute('cy', y);
+
+      reticleH.setAttribute('x1', x - 26);
+      reticleH.setAttribute('x2', x + 26);
+      reticleH.setAttribute('y1', y);
+      reticleH.setAttribute('y2', y);
+
+      reticleV.setAttribute('x1', x);
+      reticleV.setAttribute('x2', x);
+      reticleV.setAttribute('y1', y - 26);
+      reticleV.setAttribute('y2', y + 26);
+    }
+
+    // 다트 발사 실행 함수
+    function shootAtCurrentAim() {
+      // 투척 시 약간의 현실감 있는 손떨림 오차(±3~5px) 적용
+      const jitterX = (Math.random() - 0.5) * 8;
+      const jitterY = (Math.random() - 0.5) * 8;
+      const finalX = state.aimX + jitterX;
+      const finalY = state.aimY + jitterY;
+
+      // 중심점 (200, 200)으로부터의 거리 계산
+      const dx = finalX - 200;
+      const dy = finalY - 200;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      let score = 0;
+      if (dist <= 25) {
+        score = 10;
+      } else if (dist <= 60) {
+        score = 8;
+      } else if (dist <= 100) {
+        score = 6;
+      } else if (dist <= 140) {
+        score = 4;
+      } else if (dist <= 180) {
+        score = 2;
+      } else {
+        score = 0;
+      }
+
+      addDartShot(score, finalX, finalY);
+    }
+
+    // 발사 버튼 클릭 & 스페이스바 단축키 이벤트
+    btnShootDart.addEventListener('click', () => {
+      shootAtCurrentAim();
+    });
+
+    window.addEventListener('keydown', (e) => {
+      // 퀴즈 입력 중이 아닐 때 스페이스바 누르면 발사
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+        e.preventDefault();
+        shootAtCurrentAim();
+      }
+    });
+
+    // 상시 초점 자동 흔들림 루프 (리사주 곡선 애니메이션)
+    function aimAnimationLoop() {
+      state.aimTime += 0.035;
+      const targetX = 200 + Math.sin(state.aimTime * 1.3) * 110 + Math.cos(state.aimTime * 0.7) * 40;
+      const targetY = 200 + Math.cos(state.aimTime * 1.1) * 110 + Math.sin(state.aimTime * 0.9) * 35;
+      setReticlePosition(targetX, targetY);
+      requestAnimationFrame(aimAnimationLoop);
+    }
+    requestAnimationFrame(aimAnimationLoop);
+
+    // 다트 투척 데이터 추가 공통 함수
+    function addDartShot(score, x, y) {
+      if (state.scores.length >= 15) {
+        showToast('최대 15발까지 모두 던졌습니다! 퀴즈를 풀어보세요.', 'bg-amber-200 text-amber-800');
+        playSound('wrong');
+        return;
+      }
+
+      if (score === 0) {
+        showToast('아쉬워요! 과녁 밖 빗나감 (0점)', 'bg-slate-200 text-slate-700');
+        playSound('wrong');
+        // 0점도 횟수에 포함하려면 아래 조건문 바깥에 두거나 포함시킵니다.
+      }
+
+      const shotId = Date.now() + Math.random().toString(16).slice(2);
+      state.scores.push(score);
+      state.hitPositions.push({ id: shotId, x, y, score });
+
+      // 사운드 및 효과
+      if (score === 10) {
+        playSound('bullseye');
+        triggerConfetti(0.3);
+        showToast('🎯 대박! 불스아이 10점!', 'bg-pink-500 text-white animate-bounce');
+      } else if (score > 0) {
+        playSound('hit');
+        showToast(`+${score}점 명중!`, getScoreBadgeStyle(score));
+      } else {
+        playSound('wrong');
+      }
+
+      renderDartHitSvg(x, y, score, shotId);
+      updateAll();
+
+      if (state.scores.length >= 15) {
+        document.getElementById('guide-text').innerHTML = '<b>15발 모두 완료!</b> 아래에서 대푯값을 계산해 입력해 보세요.';
+        btnShootDart.disabled = true;
+      }
+    }
+
+    // 다트 핀 시각적 렌더링
+    function renderDartHitSvg(x, y, score, id) {
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('id', `hit-${id}`);
+      g.setAttribute('class', 'animate-dartFlight');
+
+      // 다트 핀 심볼 (바늘, 날개, 핀 머리)
+      g.innerHTML = `
+        <!-- 그림자 -->
+        <ellipse cx="${x + 3}" cy="${y + 3}" rx="5" ry="3" fill="rgba(0,0,0,0.25)" />
+        <!-- 다트 몸체 -->
+        <circle cx="${x}" cy="${y}" r="6.5" fill="${getScoreColor(score)}" stroke="#ffffff" stroke-width="2"/>
+        <circle cx="${x}" cy="${y}" r="2.5" fill="#ffffff" />
+      `;
+      dartHitsLayer.appendChild(g);
+    }
+
+    function getScoreColor(score) {
+      switch(score) {
+        case 10: return '#FF3366';
+        case 8: return '#FF7A59';
+        case 6: return '#FBBF24';
+        case 4: return '#34D399';
+        case 2: return '#60A5FA';
+        default: return '#94A3B8';
+      }
+    }
+
+    function getScoreBadgeStyle(score) {
+      switch(score) {
+        case 10: return 'bg-pink-100 text-pink-700 border border-pink-300';
+        case 8: return 'bg-rose-100 text-rose-700 border border-rose-300';
+        case 6: return 'bg-amber-100 text-amber-800 border border-amber-300';
+        case 4: return 'bg-emerald-100 text-emerald-800 border border-emerald-300';
+        case 2: return 'bg-sky-100 text-sky-800 border border-sky-300';
+        default: return 'bg-slate-100 text-slate-700';
+      }
+    }
+
+    // 토스트 팝업 띄우기
+    let toastTimeout;
+    function showToast(text, styleClasses) {
+      clearTimeout(toastTimeout);
+      hitToast.className = `absolute pointer-events-none transition-all duration-300 font-fun text-xl sm:text-2xl font-bold px-4 py-1.5 rounded-full shadow-lg ${styleClasses}`;
+      hitToast.textContent = text;
+      hitToast.style.opacity = '1';
+      hitToast.style.transform = 'translateY(-20px)';
+
+      toastTimeout = setTimeout(() => {
+        hitToast.style.opacity = '0';
+        hitToast.style.transform = 'translateY(-4px)';
+      }, 900);
+    }
+
+    // 전체 상태 및 화면 갱신
+    function updateAll() {
+      const n = state.scores.length;
+      dartCountEl.textContent = n;
+      btnUndo.disabled = n === 0;
+
+      if (n < 15) {
+        btnShootDart.disabled = false;
+        document.getElementById('guide-text').innerHTML = '초점을 맞추고 타이밍에 맞춰 <b>[🎯 발사!]</b> 버튼을 누르세요! (최대 15발)';
+      }
+
+      // 점수 목록 렌더링
+      renderScoreList();
+
+      // 퀴즈 폼 활성화 제어 (최소 3개 이상일 때)
+      if (n >= 3) {
+        quizForm.classList.remove('opacity-40', 'pointer-events-none');
+        quizEmptyAlert.classList.add('hidden');
+      } else {
+        quizForm.classList.add('opacity-40', 'pointer-events-none');
+        quizEmptyAlert.classList.remove('hidden');
+        quizFeedbackBox.classList.add('hidden');
+        document.getElementById('quiz-mean-status').innerHTML = '';
+        document.getElementById('quiz-median-status').innerHTML = '';
+        document.getElementById('quiz-mode-status').innerHTML = '';
+      }
+    }
+
+    // 변량 목록 렌더링
+    function renderScoreList() {
+      if (state.scores.length === 0) {
+        scoreTagsContainer.innerHTML = `<span class="text-xs text-slate-400 font-normal italic px-2">과녁을 향해 다트를 던져보세요! 데이터가 여기에 쌓입니다.</span>`;
+        sortedPreviewEl.textContent = '-';
+        sumPreviewEl.textContent = '0';
+        return;
+      }
+
+      // 점수 태그들
+      scoreTagsContainer.innerHTML = state.scores.map((s, idx) => `
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-num font-bold ${getScoreBadgeStyle(s)} animate-popIn">
+          <span class="text-[10px] text-slate-400">#${idx + 1}</span> ${s}점
+        </span>
+      `).join('');
+
+      // 정렬된 배열
+      const sorted = [...state.scores].sort((a, b) => a - b);
+      sortedPreviewEl.textContent = `[ ${sorted.join(', ')} ]`;
+      const sum = state.scores.reduce((acc, cur) => acc + cur, 0);
+      sumPreviewEl.textContent = sum;
+    }
+
+    // 통계 계산 알고리즘 (중1 수학 교육과정 충실 반영)
+    function calculateStats() {
+      const n = state.scores.length;
+      if (n === 0) {
+        return { mean: null, median: null, modes: [], sorted: [], sum: 0, count: 0 };
+      }
+
+      const sum = state.scores.reduce((a, b) => a + b, 0);
+      // 평균 (소수 둘째자리 반올림 표시)
+      const rawMean = sum / n;
+      const mean = Math.round(rawMean * 100) / 100;
+
+      // 중앙값
+      const sorted = [...state.scores].sort((a, b) => a - b);
+      let median;
+      if (n % 2 === 1) {
+        // 홀수개: 정중앙
+        median = sorted[Math.floor(n / 2)];
+      } else {
+        // 짝수개: 가운데 두 값의 평균
+        const mid1 = sorted[n / 2 - 1];
+        const mid2 = sorted[n / 2];
+        median = Math.round(((mid1 + mid2) / 2) * 100) / 100;
+      }
+
+      // 최빈값 계산 (도수 구하기)
+      const freqMap = {};
+      state.scores.forEach(val => {
+        freqMap[val] = (freqMap[val] || 0) + 1;
+      });
+
+      let maxFreq = 0;
+      for (const val in freqMap) {
+        if (freqMap[val] > maxFreq) {
+          maxFreq = freqMap[val];
+        }
+      }
+
+      // 모든 변량의 빈도가 같은지 판별
+      const uniqueVals = Object.keys(freqMap);
+      const allSameFreq = uniqueVals.length > 1 && uniqueVals.every(v => freqMap[v] === maxFreq);
+
+      let modes = [];
+      if (!allSameFreq) {
+        // 빈도가 가장 큰 값들 추출
+        for (const val in freqMap) {
+          if (freqMap[val] === maxFreq) {
+            modes.push(parseInt(val, 10));
+          }
+        }
+        modes.sort((a, b) => a - b);
+      } else {
+        // 중1 과정: 모든 변량의 도수가 같은 경우 최빈값은 "없다"고 함
+        modes = [];
+      }
+
+      return { mean, rawMean, median, modes, maxFreq, sorted, sum, count: n, freqMap, allSameFreq };
+    }
+
+    // 퀴즈 탭 채점 로직
+    quizForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const stats = calculateStats();
+      if (stats.count < 3) return;
+
+      const userMean = parseFloat(inputQuizMean.value);
+      const userMedian = parseFloat(inputQuizMedian.value);
+      const userModeRaw = inputQuizMode.value.trim();
+
+      // 최빈값 사용자 입력 파싱 ('없음' 또는 쉼표 구분 숫자들)
+      let userModes = [];
+      let userSaidNone = false;
+      if (userModeRaw === '없음' || userModeRaw === '0' || userModeRaw === '') {
+        userSaidNone = true;
+      } else {
+        userModes = userModeRaw.split(',')
+          .map(s => parseInt(s.trim(), 10))
+          .filter(n => !isNaN(n))
+          .sort((a, b) => a - b);
+      }
+
+      // 채점
+      const isMeanCorrect = !isNaN(userMean) && Math.abs(userMean - stats.mean) < 0.05;
+      const isMedianCorrect = !isNaN(userMedian) && Math.abs(userMedian - stats.median) < 0.01;
+      
+      let isModeCorrect = false;
+      if (stats.modes.length === 0) {
+        isModeCorrect = userSaidNone;
+      } else {
+        // 배열 비교
+        isModeCorrect = userModes.length === stats.modes.length &&
+          userModes.every((val, idx) => val === stats.modes[idx]);
+      }
+
+      // 인라인 상태 아이콘 갱신
+      document.getElementById('quiz-mean-status').innerHTML = isMeanCorrect ? '✅ 정답!' : '❌ 오답';
+      document.getElementById('quiz-mean-status').className = `text-xs font-bold ${isMeanCorrect ? 'text-emerald-600' : 'text-rose-600'}`;
+
+      document.getElementById('quiz-median-status').innerHTML = isMedianCorrect ? '✅ 정답!' : '❌ 오답';
+      document.getElementById('quiz-median-status').className = `text-xs font-bold ${isMedianCorrect ? 'text-emerald-600' : 'text-rose-600'}`;
+
+      document.getElementById('quiz-mode-status').innerHTML = isModeCorrect ? '✅ 정답!' : '❌ 오답';
+      document.getElementById('quiz-mode-status').className = `text-xs font-bold ${isModeCorrect ? 'text-emerald-600' : 'text-rose-600'}`;
+
+      const totalCorrect = [isMeanCorrect, isMedianCorrect, isModeCorrect].filter(Boolean).length;
+
+      quizFeedbackBox.classList.remove('hidden');
+      if (totalCorrect === 3) {
+        playSound('bullseye');
+        triggerConfetti(0.8);
+        quizFeedbackBox.className = 'mt-3.5 p-3.5 rounded-2xl text-xs md:text-sm bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold';
+        quizFeedbackBox.innerHTML = `🎉 대단해요! 3문제 모두 완벽히 맞혔습니다! 통계 마스터 등극! 🎓`;
+      } else {
+        playSound(totalCorrect > 0 ? 'correct' : 'wrong');
+        quizFeedbackBox.className = 'mt-3.5 p-3.5 rounded-2xl text-xs md:text-sm bg-amber-50 text-amber-900 border border-amber-300';
+        quizFeedbackBox.innerHTML = `
+          <div class="font-bold mb-1 text-sm">총 3개 중 ${totalCorrect}개를 맞혔어요! 다시 한번 확인해볼까요? 💪</div>
+          <div class="text-xs space-y-1">
+            <div>• 실제 정답 평균: <b class="text-pink-700">${stats.mean}점</b></div>
+            <div>• 실제 정답 중앙값: <b class="text-purple-700">${stats.median}점</b></div>
+            <div>• 실제 정답 최빈값: <b class="text-emerald-700">${stats.modes.length ? stats.modes.join(', ') + '점' : '없음'}</b></div>
+          </div>
+        `;
+      }
+    });
+
+    // 되돌리기 (Undo) 버튼
+    btnUndo.addEventListener('click', () => {
+      if (state.scores.length === 0) return;
+      const lastHit = state.hitPositions.pop();
+      state.scores.pop();
+
+      if (lastHit) {
+        const el = document.getElementById(`hit-${lastHit.id}`);
+        if (el) el.remove();
+      }
+
+      showToast('마지막 1발을 취소했습니다.', 'bg-slate-200 text-slate-700');
+      updateAll();
+    });
+
+    // 초기화 버튼
+    btnReset.addEventListener('click', () => {
+      state.scores = [];
+      state.hitPositions = [];
+      dartHitsLayer.innerHTML = '';
+      btnShootDart.disabled = false;
+      document.getElementById('guide-text').innerHTML = '초점을 맞추고 타이밍에 맞춰 <b>[🎯 발사!]</b> 버튼을 누르세요! (최대 15발)';
+      
+      // 퀴즈 입력창 초기화
+      inputQuizMean.value = '';
+      inputQuizMedian.value = '';
+      inputQuizMode.value = '';
+      document.getElementById('quiz-mean-status').innerHTML = '';
+      document.getElementById('quiz-median-status').innerHTML = '';
+      document.getElementById('quiz-mode-status').innerHTML = '';
+      quizFeedbackBox.classList.add('hidden');
+
+      showToast('다트판을 깨끗이 비웠습니다!', 'bg-slate-100 text-slate-700');
+      updateAll();
+    });
+
+    // 샘플 7발 채우기 (빠른 수업 시연용)
+    btnRandomFill.addEventListener('click', () => {
+      btnReset.click();
+      // 중1 학생들이 쉽게 계산해볼 수 있는 흥미로운 데이터셋 생성 (15발로 구성)
+      const sampleSet = [4, 6, 8, 6, 10, 6, 2, 8, 4, 10, 6, 4, 8, 2, 6];
+      
+      sampleSet.forEach((score, index) => {
+        setTimeout(() => {
+          let minR = 0, maxR = 25;
+          if (score === 10) { minR = 0; maxR = 24; }
+          else if (score === 8) { minR = 28; maxR = 58; }
+          else if (score === 6) { minR = 64; maxR = 98; }
+          else if (score === 4) { minR = 104; maxR = 138; }
+          else if (score === 2) { minR = 144; maxR = 178; }
+
+          const angle = (Math.PI * 2 / 15) * index + (Math.random() * 0.4 - 0.2);
+          const radius = minR + Math.random() * (maxR - minR);
+          const x = 200 + Math.cos(angle) * radius;
+          const y = 200 + Math.sin(angle) * radius;
+
+          addDartShot(score, x, y);
+        }, index * 80);
+      });
+    });
+
+    // 사운드 토글
+    btnSound.addEventListener('click', () => {
+      state.soundEnabled = !state.soundEnabled;
+      soundIcon.textContent = state.soundEnabled ? '🔊' : '🔇';
+      showToast(state.soundEnabled ? '소리가 켜졌습니다.' : '소리가 꺼졌습니다.', 'bg-slate-100 text-slate-700');
+    });
+
+    // 콘페티 폭죽 함수
+    function triggerConfetti(intensity = 0.5) {
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: Math.floor(40 * intensity),
+          spread: 60,
+          origin: { y: 0.65 },
+          colors: ['#FFB5A7', '#D8B4F8', '#FFF3B0', '#D0E8FF', '#74C69D']
+        });
+      }
+    }
+
+    // 초기 실행
+    window.onload = function() {
+      updateAll();
+    };
+  </script>
+</body>
+</html>
